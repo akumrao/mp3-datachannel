@@ -1,6 +1,27 @@
 # mp3-datachannel
 Mp3 streaming over webrtc data channel
 
+
+## Usage
+
+The signaling server uses Node.js, `express` and `ws` and can be started as such:
+
+```
+$ npm install
+$ npm start
+```
+
+With the server running, open two windows of a recent version of Firefox, Chrome, or Safari and visit `https://localhost:8443`.
+
+* Note the HTTPS! There is no redirect from HTTP to HTTPS.
+* Some browsers or OSs may not allow the webcam to be used by multiple pages at once. You may need to use two different browsers or machines.
+
+## TLS
+To enable secured https
+Recent versions of Chrome require secure websockets for WebRTC. Thus, this example utilizes HTTPS. Included is a self-signed certificate that must be accepted in the browser for the example to work.
+
+
+
 **Limitation of webrtc Audio channel with RTP packets are as follows**
 
 Please check broadcast at mediaserer for mp3 streaming over audio channel
@@ -93,4 +114,6 @@ Stereo	0: L: left
 4: SL: surround left
 5: SR: surround right
  
+
+
 
