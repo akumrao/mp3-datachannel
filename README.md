@@ -141,20 +141,17 @@ sudo ninja -C build install
 
 
 
+cd  mp3-datachannel/
 
-then make dir build  mp3-datachannel/build  
-cd build
-
-cmake -DCMAKE_BUILD_TYPE=Debug ..
+cmake -DCMAKE_BUILD_TYPE=Debug .
 
 make
 
-mp3-datachannel/build/websocket_client
-
+cd mp3-datachannel/websocket_client
 
 ./testclient
 
-
+you will see mp4 movie at browser
 
 
 
