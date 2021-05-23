@@ -1,249 +1,241 @@
 
-// Define "global" variables
 
-// UI variables
-var connectButton = null;
-var disconnectButton = null;
-var sendButton = null;
-var messageInputBox = null;
-var receiveBox = null;
+  // Global vars
+  var dataChannelLabel = "testchannel";
+  var reliableSocket = null;
+  var peerConnection = null;
+  var dataChannel = null;
+  var remoteCandidates = [];
+  var have_answer = false;
 
-// Signalling Variables (used to communicate via server)
-var uuid;
-var serverConnection;
-
-// RTC Variables!!
-var peerConnection = null;  // RTCPeerConnection
-var dataChannel = null;     // RTCDataChannel
-
-var peerConnectionConfig = {
-  'iceServers': [
-    { 'urls': 'stun:stun.stunprotocol.org:3478' },
-    { 'urls': 'stun:stun.l.google.com:19302' },
-  ]
-};
-
-// Functions
-
-// Set things up, connect event listeners, etc.
-
-function startup() {
-  // Get the local UI elements ready
-  connectButton = document.getElementById('connectButton');
-  disconnectButton = document.getElementById('disconnectButton');
-  sendButton = document.getElementById('sendButton');
-  messageInputBox = document.getElementById('message');
-  receiveBox = document.getElementById('receivebox');
-
-  // Set event listeners for user interface widgets
-
-  connectButton.addEventListener('click', connect, false);
-  disconnectButton.addEventListener('click', disconnectPeers, false);
-  sendButton.addEventListener('click', sendMessageThroughDataChannel, false);
-
-  // And set up connection to our websocket signalling server
-
-  uuid = createUUID();
-
-  //serverConnection = new WebSocket('wss://' + window.location.hostname + ':8443');
-
-   window.WebSocket = window.WebSocket || window.MozWebSocket;
-
-  if (!window.WebSocket) {
-    alert('Your browser doesn\'t support WebSocket');
-    return;
+  function reliable_log_msg(msg) {
+    console.log(msg);
+    $("#reliable_log_list").prepend("<li>" + msg + "</li>");
   }
 
-  serverConnection = new WebSocket(window.location.href.replace('http://', 'ws://').replace('https://', 'wss://'));
-  
-
-  serverConnection.onmessage = gotMessageFromServer;
-}
-
-// Called when we initiate the connection
-
-function connect() {
-  console.log('connect');
-  start(true);
-}
-
-// Start the WebRTC Connection
-// We're either the caller (when we click 'connect' on our page)
-// Or the receiver (when the other page clicks 'connect' and we recieve a signalling message through the websocket server)
-
-function start(isCaller) {
-  peerConnection = new RTCPeerConnection(peerConnectionConfig);
-  peerConnection.onicecandidate = gotIceCandidate;
-
-  // If we're the caller, we create the Data Channel
-  // Otherwise, it opens for us and we receive an event as soon as the peerConnection opens
-  if (isCaller) {
-    dataChannel = peerConnection.createDataChannel("testChannel");
-    dataChannel.onmessage = handleDataChannelReceiveMessage;
-    dataChannel.onopen = handleDataChannelStatusChange;
-    dataChannel.onclose = handleDataChannelStatusChange;
-  } else {
-    peerConnection.ondatachannel = handleDataChannelCreated;
+  function datachannel_log_msg(msg) {
+    console.log(msg);
+    $("#datachannel_log_list").prepend("<li>" + msg + "</li>");
   }
 
-  // Kick it off (if we're the caller)
-  if (isCaller) {
-    peerConnection.createOffer()
-        .then(offer => peerConnection.setLocalDescription(offer))
-        .then(() => console.log('set local offer description'))
-        .then(() => serverConnection.send(JSON.stringify({ 'sdp': peerConnection.localDescription, 'uuid': uuid })))
-        .then(() => console.log('sent offer description to remote'))
-        .catch(errorHandler);
-  }
-}
+    $(document).ready(function () {
 
-// Handle messages from the Websocket signalling server
+      var sourceBuffer = null;
+      var video = document.querySelector('video');
+      var mimeCodec = 'video/mp4; codecs="avc1.42E01E, mp4a.40.2"';
 
-function gotMessageFromServer(message) {
-  // If we haven't started WebRTC, now's the time to do it
-  // We must be the receiver then (ie not the caller)
-  if (!peerConnection) start(false);
+      if ('MediaSource' in window && MediaSource.isTypeSupported(mimeCodec)) {
+        var mediaSource = new MediaSource;
+        video.src = URL.createObjectURL(mediaSource);
+        mediaSource.addEventListener('sourceopen', function () {
+          sourceBuffer = mediaSource.addSourceBuffer(mimeCodec);
+          sourceBuffer.addEventListener('updateend', function () {
+            video.play();
+          });
+        });
+      } else {
+        console.error("Unsupported MIME type or codec: ", mimeCodec);
+      }
 
-  var signal = JSON.parse(message.data);
+      /**
+       * Add the various callback handlers to the PeerConnection.
+       * Shared between both clients.
+       */
+      var setupPeerConnection = function () {
+        peerConnection = new RTCPeerConnection({
+          iceServers: [{
+              urls: [
+                "stun:stun.l.google.com:19302",
+                "stun:stun1.l.google.com:19302",
+                "stun:stun2.l.google.com:19302",
+                "stun:stun3.l.google.com:19302",
+                "stun:stun4.l.google.com:19302"
+        ]}]});
 
-  // Ignore messages from ourself
-  if (signal.uuid == uuid) return;
+        peerConnection.onicecandidate = function (event) {
+          if (event.candidate) {
+            reliableSocket.sendMessage("candidate", event.candidate);
+          } else {
+            datachannel_log_msg("All local candidates received");
+          }
+        };
 
-  console.log('signal: ' + message.data);
-
-  if (signal.sdp) {
-    peerConnection.setRemoteDescription(new RTCSessionDescription(signal.sdp))
-      .then(() => console.log('set remote description'))
-      .then(function () {
-        // Only create answers in response to offers
-        if (signal.sdp.type == 'offer') {
-          console.log('got offer');
-
-          peerConnection.createAnswer()
-            .then(answer => peerConnection.setLocalDescription(answer))
-            .then(() => console.log('set local answer description'))
-            .then(() => serverConnection.send(JSON.stringify({ 'sdp': peerConnection.localDescription, 'uuid': uuid })))
-            .then(() => console.log('sent answer description to remote'))
-            .catch(errorHandler);
+        peerConnection.ondatachannel = function (event) {
+          if (event.channel.label == dataChannelLabel) {
+            dataChannel = event.channel;
+            datachannel_log_msg("DataChannel received");
+            setupDataChannel(event.channel);
+          } else {
+            datachannel_log_msg("Unknown CataChannel label: " + event.channel.label);
+          }
         }
-      })
-      .catch(errorHandler);
-  } else if (signal.ice) {
-    console.log('received ice candidate from remote');
-    peerConnection.addIceCandidate(new RTCIceCandidate(signal.ice))
-      .then(() => console.log('added ice candidate'))
-      .catch(errorHandler);
-  }
-}
+      };
 
-function gotIceCandidate(event) {
-  if (event.candidate != null) {
-    console.log('got ice candidate');
-    serverConnection.send(JSON.stringify({ 'ice': event.candidate, 'uuid': uuid }))
-    console.log('sent ice candiate to remote');
-  }
-}
+      /**
+       * Add the various callback handlers to the DataChannel.
+       * Shared between both clients.
+       */
+      var setupDataChannel = function (dataChannel) {
+        dataChannel.onopen = function (e) {
+          datachannel_log_msg("DataChannel open and ready to be used");
 
-// Called when we are not the caller (ie we are the receiver)
-// and the data channel has been opened
-function handleDataChannelCreated(event) {
-  console.log('dataChannel opened');
+          $("#send_datachannel_msg").click(function () {
+            var msg = $("#datachannel_msg").val();
+            datachannel_log_msg("Sending message: " + msg);
+            dataChannel.send(msg);
+          });
+        };
 
-  dataChannel = event.channel;
-  dataChannel.onmessage = handleDataChannelReceiveMessage;
-  dataChannel.onopen = handleDataChannelStatusChange;
-  dataChannel.onclose = handleDataChannelStatusChange;
-}
+        dataChannel.onclose = function () {
+          datachannel_log_msg("DataChannel closed");
+        };
 
-// Handles clicks on the "Send" button by transmitting
+        dataChannel.onerror = function (e) {
+          datachannel_log_msg("DataChannel error: " + e.message);
+          console.log(e);
+        };
 
-// a message to the remote peer.
+        dataChannel.onmessage = function (e) {
+          datachannel_log_msg("Received message: " + e.data);
+          if (sourceBuffer != null) {
+            sourceBuffer.appendBuffer(e.data);
+          } else {
+            console.log("Got data but sourceBuffer is null");
+          }
+        };
+      };
 
-function sendMessageThroughDataChannel() {
-  var message = messageInputBox.value;
-  console.log("sending: " + message);
-  dataChannel.send(message);
+      var createOffer = function () {
+        setupPeerConnection();
+        dataChannel = peerConnection.createDataChannel("testchannel");
+        setupDataChannel(dataChannel);
 
-  // Clear the input box and re-focus it, so that we're
-  // ready for the next message.
+        peerConnection.createOffer().then(function(offer) {
+          return peerConnection.setLocalDescription(offer);
+        })
+        .then(function() {
+          reliableSocket.sendMessage("offer", peerConnection.localDescription);
+        })
+        .catch(function(reason) {
+          // An error occurred, so handle the failure to connect
+          console.log("RTC Error", reason);
+        });
+      };
 
-  messageInputBox.value = "";
-  messageInputBox.focus();
-}
+      var createAnswer = function (msg) {
+        setupPeerConnection();
 
-// Handle status changes on the local end of the data
-// channel; this is the end doing the sending of data
-// in this example.
+        var desc = new RTCSessionDescription(msg);
 
-function handleDataChannelStatusChange(event) {
-  if (dataChannel) {
-    console.log("dataChannel status: " + dataChannel.readyState);
+        peerConnection.setRemoteDescription(desc)
+        .then(function () {
+          return peerConnection.createAnswer();
+        })
+        .then(function(answer) {
+          return peerConnection.setLocalDescription(answer);
+        })
+        .then(function() {
+          reliableSocket.sendMessage("answer", peerConnection.localDescription);
+        })
+        .catch(function () {
+          console.log("RTC Error", reason);
+        });
+      };
 
-    var state = dataChannel.readyState;
+      var handleCandidate = function (msg) {
+        var candidate = new RTCIceCandidate(msg);
+        peerConnection.addIceCandidate(candidate).then(function () {
+          datachannel_log_msg("New remote candidate received");
+        }).catch(function (e) {
+          console.log("Error: Failure during addIceCandidate()", e);
+        });
+      }
 
-    if (state === "open") {
-      messageInputBox.disabled = false;
-      messageInputBox.focus();
-      sendButton.disabled = false;
-      disconnectButton.disabled = false;
-      connectButton.disabled = true;
-    } else {
-      messageInputBox.disabled = true;
-      sendButton.disabled = true;
-      connectButton.disabled = false;
-      disconnectButton.disabled = true;
-    }
-  }
-}
+      $("#connect_channel").on('click', function (e) {
+       // var channel_name = $("#channel_name").val();
+        //var wsAddress = "ws://" + window.location.host + "/channel/" + channel_name;
+       // console.log("Attempting WebSocket connection to " + wsAddress);
 
-// Handle onmessage events for the data channel.
-// These are the data messages sent by the remote channel.
+        //reliableSocket = new WebSocket(wsAddress);
 
-function handleDataChannelReceiveMessage(event) {
-  console.log("Message: " + event.data);
-  var el = document.createElement("p");
-  var txtNode = document.createTextNode(event.data);
+        window.WebSocket = window.WebSocket || window.MozWebSocket;
 
-  el.appendChild(txtNode);
-  receiveBox.appendChild(el);
-}
+        if (!window.WebSocket) {
+          alert('Your browser doesn\'t support WebSocket');
+          return;
+        }
 
-// Close the connection, including data channels if it's open.
-// Also update the UI to reflect the disconnected status.
+        reliableSocket = new WebSocket(window.location.href.replace('http://', 'ws://').replace('https://', 'wss://'));
 
-function disconnectPeers() {
 
-  // Close the RTCDataChannel if it's open.
 
-  dataChannel.close();
 
-  // Close the RTCPeerConnection
+        reliableSocket.onopen = function (event) {
+          // Socket is now ready to send and receive messages
+          console.log("reliableSocket is open and ready to use");
+          reliableSocket.sendMessage("client_connected", {});
+        };
 
-  peerConnection.close();
+        reliableSocket.onerror = function (event) {
+          // Socket failed to connect
+        };
 
-  dataChannel = null;
-  peerConnection = null;
+        reliableSocket.onclose = function (event) {
+          console.log("ERROR: Reliable socket has closed");
+        };
 
-  // Update user interface elements
+        // Simple helper to send JSON messages with a given type
+        reliableSocket.sendMessage = function (type, msg) {
+          reliable_log_msg("Sending msg of type: " + type);
+          reliableSocket.send(JSON.stringify({"type": type, "msg": msg}));
+        }
 
-  connectButton.disabled = false;
-  disconnectButton.disabled = true;
-  sendButton.disabled = true;
+        reliableSocket.onmessage = function (event) {
+          console.log("Got msg", event);
+          var msg = JSON.parse(event.data);
 
-  messageInputBox.value = "";
-  messageInputBox.disabled = true;
-}
+          reliable_log_msg("Received msg of type: " + msg.type);
+          console.log(msg);
 
-function errorHandler(error) {
-  console.log(error);
-}
+          switch (msg.type) {
+            case "client_connected":
+              reliable_log_msg("Client connected: starting RTC handshake");
+              createOffer();
+              break;
+            case "client_disconnected":
+              reliable_log_msg("Remote client disconnected");
+              break;
+            case "offer":
+              createAnswer(msg.msg);
+              break;
+            case "answer":
+              peerConnection.setRemoteDescription(new RTCSessionDescription(msg.msg))
+              .then(function () {
+                have_answer = true;
+                var i = 0;
+                for (i = 0; i < remoteCandidates.length; i++) {
+                  handleCandidate(remoteCandidates[i]);
+                }
+              });
+              break;
+            case "candidate":
+              if (msg.msg.candidate) {
+                if (!have_answer) {
+                  remoteCandidates.push(msg.msg);
+                } else {
+                  handleCandidate(msg.msg);
+                }
+              } else {
+                console.log("Remote peer has no more candidates");
+              }
+              break;
+            default:
+              console.log("WARNING: Ignoring unknown msg of type '" + msg.type + "'");
+              break;
+          }
+        };
 
-// Taken from http://stackoverflow.com/a/105074/515584
-// Strictly speaking, it's not a real UUID, but it gets the job done here
-function createUUID() {
-  function s4() {
-    return Math.floor((1 + Math.random()) * 0x10000).toString(16).substring(1);
-  }
 
-  return s4() + s4() + '-' + s4() + '-' + s4() + '-' + s4() + '-' + s4() + s4() + s4();
-}
+      });
+
+    });

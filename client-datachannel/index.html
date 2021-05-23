@@ -1,35 +1,38 @@
-<!doctype html>
+<!DOCTYPE html>
 <html>
 <head>
-  <title>Mp3 over data channel</title>
-  <meta charset="utf-8">
-  <link rel="stylesheet" href="main.css" type="text/css" media="all">
-  <script src="https://webrtc.github.io/adapter/adapter-latest.js"></script>
+  <title>WebRTC DataChannels Demo Site</title>
+  <link rel="stylesheet" type="text/css" href="demo.css">
+  <script src="jquery-3.0.0.min.js"></script>
+  <script src="adapter.js"></script>
   <script src="main.js"></script>
+
 </head>
-<body onload="startup();">
-  <h1>Mp3 over data channel</h1>
-  
-  <div class="controlbox">
-    <button id="connectButton" name="connectButton" class="buttonleft">
-      Connect
-    </button>
-    <button id="disconnectButton" name="disconnectButton" class="buttonright" disabled>
-      Disconnect
-    </button>
+<body>
+  <video controls></video>
+  <h1>WebRTC DataChannels Demo</h1>
+
+  <div id="channel_select">
+   <!--  <label for="channel_name">Enter a channel name:</label>
+    <input id="channel_name" type="text"></input> -->
+    <button id="connect_channel">Connect</button>
   </div>
-  
-  <div class="messagebox">
-    <label for="message">Enter a message:
-      <input type="text" name="message" id="message" placeholder="Message text" 
-              inputmode="latin" size=60 maxlength=120 disabled>
-    </label>
-    <button id="sendButton" name="sendButton" class="buttonright" disabled>
-      Send
-    </button>
+
+  <div id="logs_container">
+    <div id="reliable_logs">
+      <h2>WebSocket Logs</h2>
+      <ul id="reliable_log_list">
+      </ul>
+    </div>
+    <div id="datachannel_logs">
+      <h2>DataChannel Logs</h2>
+      <label for="datachannel_msg">Send Msg:</label>
+      <input id="datachannel_msg" type="text"></input>
+      <button id="send_datachannel_msg">Send</button>
+      <ul id="datachannel_log_list">
+      </ul>
+    </div>
   </div>
-  <div class="messagebox" id="receivebox">
-    <p>Messages received:</p>
-  </div>
+
 </body>
 </html>
