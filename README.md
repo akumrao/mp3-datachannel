@@ -10,6 +10,15 @@ The signaling server uses Node.js, `express` and `ws` and can be started as such
 $ npm install
 $ npm start
 ```
+open browser
+http://localhost:8000/
+presse connect
+
+
+open c++ app or one more browser tab 
+./testclient  // check beneath for compilation
+
+
 
 With the server running, open two windows of a recent version of Firefox, Chrome, or Safari and visit `https://localhost:8443`.
 
@@ -93,6 +102,60 @@ a)Unreal Engine does not support mp3 and AAC file format
 b) Fade in and out  of audo  feature of Unreal engine are complex.
 
 c)Unreal filter and sound enhancement  feature will break.
+
+
+
+For compiling c++ part
+
+git clone  https://github.com/sctplab/usrsctp
+ cd usrsctp/
+./bootstrap
+./configure
+ make install
+
+git clone https://github.com/gabime/spdlog
+mkdir build && cd build
+root:build# cmake .. && make -j
+
+for compilling nice
+
+correct way
+
+download libnice-0.1.17.tar.gz    from  https://www.mirrorservice.org/sites/distfiles.macports.org/libnice/
+
+./configure   --disable-static  --without-gstreamer-0.10
+make 
+make install
+
+apt-get install glib2-dev
+
+wrong way do not do it 
+
+apt install python3-pip
+pip3 install meson
+
+sudo pip3 install meson
+meson build --prefix=/usr
+ninja -C build
+sudo ninja -C build install
+
+
+
+
+then make dir build  mp3-datachannel/build  
+cd build
+
+cmake -DCMAKE_BUILD_TYPE=Debug ..
+
+make
+
+mp3-datachannel/build/websocket_client
+
+
+./testclient
+
+
+
 
 
 
