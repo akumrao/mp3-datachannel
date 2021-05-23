@@ -131,19 +131,19 @@ if (config.UseHTTPS) {
 // Create a server for handling websocket calls
 const wss = new WebSocket.Server({ server: config.UseHTTPS ? https : http});
 
-wss.on('connection', function(ws) {
-  ws.on('message', function(message) {
-    // Broadcast any received message to all clients
-    console.log('received: %s', message);
-    wss.broadcast(message);
+
+wss.on('connection', function connection(ws) {
+  ws.on('message', function incoming(data) {
+       console.log('received: %s', data);
+    wss.clients.forEach(function each(client) {
+      if (client !== ws && client.readyState === WebSocket.OPEN) {
+        client.send(data);
+      }
+    });
   });
 });
 
-wss.broadcast = function(data) {
-  this.clients.forEach(function(client) {
-    if(client.readyState === WebSocket.OPEN) {
-      client.send(data);
-    }
-  });
-};
+
+
+
 
