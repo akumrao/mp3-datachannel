@@ -110,8 +110,15 @@ For compiling c++ part
 git clone  https://github.com/sctplab/usrsctp
  cd usrsctp/
 ./bootstrap
-./configure
+./configure --enable-debug
  make install
+
+example
+https://chromium.googlesource.com/external/github.com/sctplab/usrsctp/+/HEAD/Manual.md
+$ ./discard_server 11111 22222
+$ ./client 127.0.0.1 9 0 22222 11111
+
+
 
 git clone https://github.com/gabime/spdlog
 mkdir build && cd build
@@ -152,8 +159,6 @@ cd mp3-datachannel/websocket_client
 ./testclient
 
 you will see mp4 movie at browser
-
-
 
 
 
