@@ -107,6 +107,10 @@ c)Unreal filter and sound enhancement  feature will break.
 
 For compiling c++ part
 
+apt-get install m4
+apt-get install automake
+apt-get install libtool
+
 git clone  https://github.com/sctplab/usrsctp
  cd usrsctp/
 ./bootstrap
@@ -129,6 +133,7 @@ for compilling nice
 correct way
 
 download libnice-0.1.17.tar.gz    from  https://www.mirrorservice.org/sites/distfiles.macports.org/libnice/
+do not use any other version and also do not try to install with apt-get install
 
 ./configure   --disable-static  --without-gstreamer-0.10
 make 
